@@ -65,7 +65,9 @@ export function NeologismProvider({ children }: { children: ReactNode }) {
   };
 
   const addNeologism = async (neologism: Omit<Neologism, 'id' | 'createdAt'>) => {
+    console.log('addNeologism called:', { neologism, isAuthenticated });
     if (!isAuthenticated) {
+      console.log('User not authenticated, showing toast');
       toast({
         title: "Authentication Required",
         description: "Please log in to create a neologism",
@@ -75,7 +77,9 @@ export function NeologismProvider({ children }: { children: ReactNode }) {
     }
     
     try {
+      console.log('Attempting to create neologism:', neologism);
       const newNeologism = await neologismService.createNeologism(neologism);
+      console.log('Neologism created successfully:', newNeologism);
       setNeologisms(prevNeologisms => [newNeologism, ...prevNeologisms]);
       setLatestNeologismId(newNeologism.id);
       toast({
