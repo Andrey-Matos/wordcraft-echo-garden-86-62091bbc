@@ -1,117 +1,24 @@
-
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { Neologism, Category, NeologismStatus } from '../types/neologism';
-
-// Sample Categories
-const initialCategories: Category[] = [
-  { id: '1', name: 'Technology' },
-  { id: '2', name: 'Slang' },
-  { id: '3', name: 'Academic' },
-  { id: '4', name: 'Business' },
-  { id: '5', name: 'Culture' },
-  { id: '6', name: 'Science' },
-];
-
-// Sample Neologisms
-const initialNeologisms: Neologism[] = [
-  {
-    id: '1',
-    name: 'Doomscrolling',
-    rootWords: ['Doom', 'Scrolling'],
-    categoryId: '1',
-    category: 'Technology',
-    definition: 'The act of continuously scrolling through negative news or social media content, despite the negative effect it has on one\'s mental health.',
-    imageUrl: 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?auto=format&fit=crop&q=80&w=400',
-    status: 'Ready',
-    createdAt: new Date('2023-01-15'),
-  },
-  {
-    id: '2',
-    name: 'Phubbing',
-    rootWords: ['Phone', 'Snubbing'],
-    categoryId: '5',
-    category: 'Culture',
-    definition: 'The practice of ignoring one\'s companion or companions in order to pay attention to one\'s phone or other mobile device.',
-    status: 'Ready',
-    createdAt: new Date('2023-02-20'),
-  },
-  {
-    id: '3',
-    name: 'Nomophobia',
-    rootWords: ['No', 'Mobile', 'Phobia'],
-    categoryId: '1',
-    category: 'Technology',
-    definition: 'The fear of being without or unable to use one\'s mobile phone.',
-    imageUrl: 'https://images.unsplash.com/photo-1582562124811-c09040d0a901?auto=format&fit=crop&q=80&w=400',
-    status: 'Ready',
-    createdAt: new Date('2023-03-10'),
-  },
-  {
-    id: '4',
-    name: 'Infodemic',
-    rootWords: ['Information', 'Epidemic'],
-    categoryId: '6',
-    category: 'Science',
-    definition: 'An excessive amount of information about a problem that is typically unreliable, spreads rapidly, and makes a solution more difficult to achieve.',
-    status: 'Draft',
-    createdAt: new Date('2023-04-05'),
-  },
-  {
-    id: '5',
-    name: 'Webinar',
-    rootWords: ['Web', 'Seminar'],
-    categoryId: '4',
-    category: 'Business',
-    definition: 'A presentation, lecture, or workshop that is transmitted over the web.',
-    imageUrl: 'https://images.unsplash.com/photo-1472396961693-142e6e269027?auto=format&fit=crop&q=80&w=400',
-    status: 'Ready',
-    createdAt: new Date('2023-05-12'),
-  },
-];
-
-// Try to load neologisms from localStorage
-const loadNeologismsFromStorage = (): Neologism[] => {
-  try {
-    const storedNeologisms = localStorage.getItem('neologisms');
-    if (storedNeologisms) {
-      const parsed = JSON.parse(storedNeologisms);
-      // Convert string dates back to Date objects
-      return parsed.map((n: any) => ({
-        ...n,
-        createdAt: new Date(n.createdAt)
-      }));
-    }
-  } catch (error) {
-    console.error('Error loading neologisms from storage:', error);
-  }
-  return initialNeologisms;
-};
-
-// Try to load categories from localStorage
-const loadCategoriesFromStorage = (): Category[] => {
-  try {
-    const storedCategories = localStorage.getItem('categories');
-    if (storedCategories) {
-      return JSON.parse(storedCategories);
-    }
-  } catch (error) {
-    console.error('Error loading categories from storage:', error);
-  }
-  return initialCategories;
-};
+import { neologismService, categoryService } from '../services/supabaseService';
+import { useAuth } from './AuthContext';
+import { toast } from '../hooks/use-toast';
 
 interface NeologismContextType {
   neologisms: Neologism[];
   categories: Category[];
-  addNeologism: (neologism: Omit<Neologism, 'id' | 'createdAt'>) => void;
-  addCategory: (category: string) => void;
-  updateNeologismStatus: (id: string, status: NeologismStatus) => void;
-  updateNeologism: (neologism: Neologism) => void;
+  loading: boolean;
+  addNeologism: (neologism: Omit<Neologism, 'id' | 'createdAt'>) => Promise<void>;
+  addCategory: (category: string) => Promise<void>;
+  updateNeologismStatus: (id: string, status: NeologismStatus) => Promise<void>;
+  updateNeologism: (neologism: Neologism) => Promise<void>;
+  deleteNeologism: (id: string) => Promise<void>;
   searchNeologisms: (query: string) => Neologism[];
   filterByCategory: (categoryId: string) => Neologism[];
   filterByStatus: (status: string) => Neologism[];
   getRandomNeologism: () => Neologism | null;
   getLatestNeologism: () => Neologism | null;
+  refreshData: () => Promise<void>;
 }
 
 const NeologismContext = createContext<NeologismContextType | undefined>(undefined);
@@ -125,67 +32,180 @@ export function useNeologism() {
 }
 
 export function NeologismProvider({ children }: { children: ReactNode }) {
-  const [neologisms, setNeologisms] = useState<Neologism[]>(loadNeologismsFromStorage());
-  const [categories, setCategories] = useState<Category[]>(loadCategoriesFromStorage());
+  const { isAuthenticated } = useAuth();
+  const [neologisms, setNeologisms] = useState<Neologism[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
   const [latestNeologismId, setLatestNeologismId] = useState<string | null>(null);
 
-  // Save to localStorage whenever neologisms or categories change
+  // Load data when component mounts or auth state changes
   useEffect(() => {
+    refreshData();
+  }, [isAuthenticated]);
+
+  const refreshData = async () => {
+    setLoading(true);
     try {
-      localStorage.setItem('neologisms', JSON.stringify(neologisms));
+      const [neologismsData, categoriesData] = await Promise.all([
+        neologismService.getNeologisms(),
+        categoryService.getCategories()
+      ]);
+      setNeologisms(neologismsData);
+      setCategories(categoriesData);
     } catch (error) {
-      console.error('Error saving neologisms to storage:', error);
+      console.error('Error loading data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-  }, [neologisms]);
+  };
 
-  useEffect(() => {
+  const addNeologism = async (neologism: Omit<Neologism, 'id' | 'createdAt'>) => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to create a neologism",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
-      localStorage.setItem('categories', JSON.stringify(categories));
+      const newNeologism = await neologismService.createNeologism(neologism);
+      setNeologisms(prevNeologisms => [newNeologism, ...prevNeologisms]);
+      setLatestNeologismId(newNeologism.id);
+      toast({
+        title: "Success",
+        description: "Neologism created successfully",
+      });
     } catch (error) {
-      console.error('Error saving categories to storage:', error);
+      console.error('Error creating neologism:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create neologism",
+        variant: "destructive",
+      });
     }
-  }, [categories]);
+  };
 
-  const addNeologism = (neologism: Omit<Neologism, 'id' | 'createdAt'>) => {
-    const newId = Date.now().toString();
-    const newNeologism = {
-      ...neologism,
-      id: newId,
-      createdAt: new Date(),
-    };
-    
-    // Find the category name from id
-    const category = categories.find(cat => cat.id === neologism.categoryId);
-    if (category && !newNeologism.category) {
-      newNeologism.category = category.name;
+  const addCategory = async (categoryName: string) => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to create a category",
+        variant: "destructive",
+      });
+      return;
     }
     
-    setNeologisms(prevNeologisms => [newNeologism, ...prevNeologisms]);
-    setLatestNeologismId(newId);
+    try {
+      const newCategory = await categoryService.createCategory(categoryName);
+      setCategories(prevCategories => [...prevCategories, newCategory]);
+      toast({
+        title: "Success",
+        description: "Category created successfully",
+      });
+    } catch (error) {
+      console.error('Error creating category:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create category",
+        variant: "destructive",
+      });
+    }
   };
 
-  const addCategory = (categoryName: string) => {
-    const newCategory = {
-      id: Date.now().toString(),
-      name: categoryName,
-    };
-    setCategories(prevCategories => [...prevCategories, newCategory]);
+  const updateNeologismStatus = async (id: string, status: NeologismStatus) => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to update neologisms",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      const updatedNeologism = await neologismService.updateNeologismStatus(id, status);
+      setNeologisms(prevNeologisms =>
+        prevNeologisms.map(neologism =>
+          neologism.id === id ? updatedNeologism : neologism
+        )
+      );
+      toast({
+        title: "Success",
+        description: "Neologism status updated",
+      });
+    } catch (error) {
+      console.error('Error updating neologism status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update neologism status",
+        variant: "destructive",
+      });
+    }
   };
 
-  const updateNeologismStatus = (id: string, status: NeologismStatus) => {
-    setNeologisms(prevNeologisms =>
-      prevNeologisms.map(neologism =>
-        neologism.id === id ? { ...neologism, status } : neologism
-      )
-    );
+  const updateNeologism = async (updatedNeologism: Neologism) => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to update neologisms",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      const result = await neologismService.updateNeologism(updatedNeologism.id, updatedNeologism);
+      setNeologisms(prevNeologisms =>
+        prevNeologisms.map(neologism =>
+          neologism.id === updatedNeologism.id ? result : neologism
+        )
+      );
+      toast({
+        title: "Success",
+        description: "Neologism updated successfully",
+      });
+    } catch (error) {
+      console.error('Error updating neologism:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update neologism",
+        variant: "destructive",
+      });
+    }
   };
 
-  const updateNeologism = (updatedNeologism: Neologism) => {
-    setNeologisms(prevNeologisms =>
-      prevNeologisms.map(neologism =>
-        neologism.id === updatedNeologism.id ? updatedNeologism : neologism
-      )
-    );
+  const deleteNeologism = async (id: string) => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to delete neologisms",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      await neologismService.deleteNeologism(id);
+      setNeologisms(prevNeologisms => prevNeologisms.filter(n => n.id !== id));
+      toast({
+        title: "Success",
+        description: "Neologism deleted successfully",
+      });
+    } catch (error) {
+      console.error('Error deleting neologism:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete neologism",
+        variant: "destructive",
+      });
+    }
   };
 
   const searchNeologisms = (query: string): Neologism[] => {
@@ -233,15 +253,18 @@ export function NeologismProvider({ children }: { children: ReactNode }) {
   const value = {
     neologisms,
     categories,
+    loading,
     addNeologism,
     addCategory,
     updateNeologismStatus,
     updateNeologism,
+    deleteNeologism,
     searchNeologisms,
     filterByCategory,
     filterByStatus,
     getRandomNeologism,
     getLatestNeologism,
+    refreshData,
   };
 
   return (
