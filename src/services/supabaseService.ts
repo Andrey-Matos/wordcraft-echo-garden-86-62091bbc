@@ -153,9 +153,6 @@ export const neologismService = {
   },
   
   async createNeologism(neologism: Omit<Neologism, 'id' | 'createdAt'>): Promise<Neologism> {
-    const user = await authService.getCurrentUser();
-    if (!user) throw new Error('User must be authenticated');
-    
     const { data, error } = await supabase
       .from('neologisms')
       .insert({
@@ -165,7 +162,7 @@ export const neologismService = {
         definition: neologism.definition,
         image_url: neologism.imageUrl,
         status: neologism.status,
-        user_id: user.id
+        user_id: null
       })
       .select(`
         *,
@@ -189,8 +186,6 @@ export const neologismService = {
   },
   
   async updateNeologism(id: string, updates: Partial<Neologism>): Promise<Neologism> {
-    const user = await authService.getCurrentUser();
-    if (!user) throw new Error('User must be authenticated');
     
     const updateData: any = {};
     if (updates.name !== undefined) updateData.name = updates.name;
@@ -230,8 +225,6 @@ export const neologismService = {
   },
   
   async deleteNeologism(id: string): Promise<void> {
-    const user = await authService.getCurrentUser();
-    if (!user) throw new Error('User must be authenticated');
     
     const { error } = await supabase
       .from('neologisms')
