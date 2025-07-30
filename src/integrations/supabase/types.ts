@@ -43,7 +43,7 @@ export type Database = {
           root_words: string[]
           status: string
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           category_id?: string | null
@@ -55,7 +55,7 @@ export type Database = {
           root_words?: string[]
           status?: string
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           category_id?: string | null
@@ -67,7 +67,7 @@ export type Database = {
           root_words?: string[]
           status?: string
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {

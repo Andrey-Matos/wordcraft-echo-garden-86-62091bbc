@@ -65,21 +65,8 @@ export function NeologismProvider({ children }: { children: ReactNode }) {
   };
 
   const addNeologism = async (neologism: Omit<Neologism, 'id' | 'createdAt'>) => {
-    console.log('addNeologism called:', { neologism, isAuthenticated });
-    if (!isAuthenticated) {
-      console.log('User not authenticated, showing toast');
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to create a neologism",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     try {
-      console.log('Attempting to create neologism:', neologism);
       const newNeologism = await neologismService.createNeologism(neologism);
-      console.log('Neologism created successfully:', newNeologism);
       setNeologisms(prevNeologisms => [newNeologism, ...prevNeologisms]);
       setLatestNeologismId(newNeologism.id);
       toast({
@@ -97,15 +84,6 @@ export function NeologismProvider({ children }: { children: ReactNode }) {
   };
 
   const addCategory = async (categoryName: string) => {
-    if (!isAuthenticated) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to create a category",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     try {
       const newCategory = await categoryService.createCategory(categoryName);
       setCategories(prevCategories => [...prevCategories, newCategory]);
@@ -124,15 +102,6 @@ export function NeologismProvider({ children }: { children: ReactNode }) {
   };
 
   const updateNeologismStatus = async (id: string, status: NeologismStatus) => {
-    if (!isAuthenticated) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to update neologisms",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     try {
       const updatedNeologism = await neologismService.updateNeologismStatus(id, status);
       setNeologisms(prevNeologisms =>
@@ -155,15 +124,6 @@ export function NeologismProvider({ children }: { children: ReactNode }) {
   };
 
   const updateNeologism = async (updatedNeologism: Neologism) => {
-    if (!isAuthenticated) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to update neologisms",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     try {
       const result = await neologismService.updateNeologism(updatedNeologism.id, updatedNeologism);
       setNeologisms(prevNeologisms =>
@@ -186,15 +146,6 @@ export function NeologismProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteNeologism = async (id: string) => {
-    if (!isAuthenticated) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to delete neologisms",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     try {
       await neologismService.deleteNeologism(id);
       setNeologisms(prevNeologisms => prevNeologisms.filter(n => n.id !== id));
